@@ -1,16 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import * as SSLCommerzPayment from 'sslcommerz-lts';
-import { PaymentRequestDto } from './dto/PaymentRequestDto';
+import { PaymentRequestDto } from './dto/paymentRequestDto';
+import { PaymentResponseDto, ResponseDto  } from './dto/paymentResponseDto';
 
 @Injectable()
 export class PaymentService {
-  async initiatePayment(data: PaymentRequestDto): Promise<string> {
-    // Initialize SSLCommerzPayment with credentials
-    const sslcommerz = new SSLCommerzPayment(
+
+  private sslcommerz: SSLCommerzPayment;
+
+  constructor() {
+    this.sslcommerz = new SSLCommerzPayment(
       process.env.STORE_ID,
       process.env.STORE_PASSWORD,
       false
     );
+  }
+
+  async initiatePayment(data: PaymentRequestDto): Promise<string> {
 
     // Transform DTO data to SSLCOMMERZ data
     const sslData = {
@@ -44,7 +50,9 @@ export class PaymentService {
 
 
     // Initiate the payment request
-    const response = await sslcommerz.init(sslData);
+    const response = await this.sslcommerz.init(sslData);
+    console.log('SSLCommerz Response:', response);
+    
     if (response?.GatewayPageURL) {
       return response.GatewayPageURL;
     } else {
@@ -54,12 +62,44 @@ export class PaymentService {
 
 
   async validatePayment(data: { val_id: string }): Promise<any> {
-    const sslcz = new SSLCommerzPayment(
-      process.env.STORE_ID,
-      process.env.STORE_PASSWORD,
-      false
-    );
+    try {
+      const validationResponse = await this.sslcommerz.validate(data);
+      return validationResponse;
+    } catch (error) {
+      console.error('Payment validation error:', error);
+      throw new Error('Error validating payment');
+    }
+  }
 
-    return sslcz.validate(data);
+  async handlePaymentSuccess(data: ResponseDto): Promise<PaymentResponseDto> {
+    const response: PaymentResponseDto = {
+      data,
+      message: 'Payment success',
+    };
+    return response;
+  }
+
+  async handlePaymentFailure(data: ResponseDto): Promise<PaymentResponseDto> {
+    const response: PaymentResponseDto = {
+      data,
+      message: 'Payment failed',
+    };
+    return response;
+  }
+
+  async handlePaymentCancellation(data: ResponseDto): Promise<PaymentResponseDto> {
+    const response: PaymentResponseDto = {
+      data,
+      message: 'Payment cancelled',
+    };
+    return response;
+  }
+
+  async handleIPNValidation(data: ResponseDto): Promise<PaymentResponseDto> {
+    const response: PaymentResponseDto = {
+      data,
+      message: 'IPN validated',
+    };
+    return response;
   }
 }

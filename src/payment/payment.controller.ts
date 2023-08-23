@@ -1,19 +1,20 @@
 import { Controller, Get, Post, Redirect, Body, Req, Res } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-import * as SSLCommerzPayment from 'sslcommerz-lts';
-import { PaymentRequestDto } from './dto/PaymentRequestDto';
+import { PaymentRequestDto } from './dto/paymentRequestDto';
+import { PaymentResponseDto, ResponseDto } from './dto/paymentResponseDto';
+import { v4 as uuidv4 } from 'uuid';
 
 @Controller()
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
-  @Get()
-  getWelcomeMessage(): { message: string; url: string } {
-    return {
-      message: 'Welcome to sslcommerz app',
-      url: `${process.env.ROOT}/ssl-request`,
-    };
-  }
+  // @Get()
+  // getWelcomeMessage(): { message: string; url: string } {
+  //   return {
+  //     message: 'Welcome to sslcommerz app',
+  //     url: `${process.env.ROOT}/ssl-request`,
+  //   };
+  // }
 
   @Get('/ssl-request')
   @Redirect()
@@ -21,7 +22,7 @@ export class PaymentController {
     const data: PaymentRequestDto = {
       total_amount: 100,
       currency: 'BDT',
-      tran_id: 'REF123',
+      tran_id: uuidv4(),
       success_url: `${process.env.ROOT}/ssl-payment-success`,
       fail_url: `${process.env.ROOT}/ssl-payment-fail`,
       cancel_url: `${process.env.ROOT}/ssl-payment-cancel`,
@@ -51,75 +52,91 @@ export class PaymentController {
     return { url: gatewayPageURL };
   }
 
-  @Get('/validate')
-  async validatePayment(@Req() req: any, @Res() res: any): Promise<void> {
-    const { val_id } = req.query; // Extracting val_id from the query parameters
+  @Post('/validate')
+  async validatePayment(
+    @Req() req: any,
+    @Res() res: any,
+  ): Promise<void> {
+    try {
+      const { val_id } = req.query;
 
-    if (!val_id) {
-      return res.status(400).json({
-        message: 'Validation failed: Missing val_id in query parameters',
-      });
-    }
+      if (!val_id) {
+        return res.status(400).json({
+          message: 'Validation failed: Missing val_id in query parameters',
+        });
+      }
 
-    const data = {
-      val_id: val_id.toString(), // Converting val_id to a string
-    };
+      const data = {
+        val_id: val_id.toString(),
+      };
 
-    const sslcz = new SSLCommerzPayment(
-      process.env.STORE_ID,
-      process.env.STORE_PASSWORD,
-      false
-    );
+      // Validate the payment using the PaymentService
+      const validationResponse = await this.paymentService.validatePayment(data);
 
-    sslcz.validate(data).then(validationResponse => {
-      return res.status(200).json({
+      // Process the validation response as needed
+      // For example, update the order status based on validation response
+
+      // Respond with a validation acknowledgement
+      res.status(200).json({
         message: 'Payment validation successful',
         data: validationResponse,
       });
-    });
+    } catch (error) {
+      console.error('Payment validation callback error:', error);
+      res.status(500).json({ message: 'Error processing payment validation callback' });
+    }
   }
-
   
   
-  @Post('/ssl-payment-notification')
-  async paymentNotification(@Body() notificationData: any): Promise<{ data: any; message: string }> {
-    return {
-      data: notificationData,
-      message: 'Payment notification',
-    };
-  }
-
   @Post('/ssl-payment-success')
-  async paymentSuccess(@Req() req: any): Promise<{ data: any; message: string }> {
-
-    return {
-      data: req.body,
-      message: 'Payment success',
-    };
+  async paymentSuccess(@Body() data: ResponseDto): Promise<PaymentResponseDto> {
+    try {
+      const response = await this.paymentService.handlePaymentSuccess(data);
+      return response;
+    } catch (error) {
+      return {
+        data,
+        message: 'Failed to process payment success',
+      };
+    }
   }
 
   @Post('/ssl-payment-fail')
-  async paymentFail(@Req() req: any): Promise<{ data: any; message: string }> {
-
-    return {
-      data: req.body,
-      message: 'Payment failed',
-    };
+  async paymentFail(@Body() data: ResponseDto): Promise<PaymentResponseDto> {
+    try {
+      const response = await this.paymentService.handlePaymentFailure(data);
+      return response;
+    } catch (error) {
+      return {
+        data,
+        message: 'Failed to process payment failure',
+      };
+    }
   }
 
   @Post('/ssl-payment-cancel')
-  async paymentCancel(@Req() req: any): Promise<{ data: any; message: string }> {
-    return {
-      data: req.body,
-      message: 'Payment cancelled',
-    };
+  async paymentCancel(@Body() data: ResponseDto): Promise<PaymentResponseDto> {
+    try {
+      const response = await this.paymentService.handlePaymentCancellation(data);
+      return response;
+    } catch (error) {
+      return {
+        data,
+        message: 'Failed to process payment cancellation',
+      };
+    }
   }
 
   @Post('/ssl-payment-ipn')
-  async paymentValidate(@Req() req: any): Promise<{ data: any; message: string }> {
-    return {
-      data: req.body,
-      message: 'Payment Validated',
-    };
+  async paymentIPN(@Body() data: ResponseDto): Promise<PaymentResponseDto> {
+    try {
+      const response = await this.paymentService.handleIPNValidation(data);
+      return response;
+    } catch (error) {
+      return {
+        data,
+        message: 'Failed to process IPN validation',
+      };
+    }
   }
 }
