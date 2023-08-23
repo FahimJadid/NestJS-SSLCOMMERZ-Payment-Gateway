@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as SSLCommerzPayment from 'sslcommerz-lts';
 import { PaymentRequestDto } from './dto/paymentRequestDto';
 import { PaymentResponseDto, ResponseDto  } from './dto/paymentResponseDto';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class PaymentService {
@@ -18,15 +19,14 @@ export class PaymentService {
 
   async initiatePayment(data: PaymentRequestDto): Promise<string> {
 
-    // Transform DTO data to SSLCOMMERZ data
     const sslData = {
       total_amount: data.total_amount,
       currency: data.currency,
-      tran_id: data.tran_id,
-      success_url: data.success_url,
-      fail_url: data.fail_url,
-      cancel_url: data.cancel_url,
-      ipn_url: data.ipn_url,
+      tran_id: data.tran_id + uuidv4(),
+      success_url: `${process.env.ROOT}/ssl-payment-success`,
+      fail_url: `${process.env.ROOT}/ssl-payment-fail`,
+      cancel_url: `${process.env.ROOT}/ssl-payment-cancel`,
+      ipn_url: `${process.env.ROOT}/ssl-payment-ipn`,
       shipping_method: data.shipping_method,
       product_name: data.product_name,
       product_category: data.product_category,
@@ -49,7 +49,6 @@ export class PaymentService {
     };
 
 
-    // Initiate the payment request
     const response = await this.sslcommerz.init(sslData);
     console.log('SSLCommerz Response:', response);
     

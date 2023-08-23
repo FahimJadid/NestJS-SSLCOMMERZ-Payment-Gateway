@@ -12,23 +12,7 @@ export class PaymentRequestDto {
   @IsNotEmpty()
   @IsString()
   tran_id: string;
-
-  @IsNotEmpty()
-  @IsString()
-  success_url: string;
-
-  @IsNotEmpty()
-  @IsString()
-  fail_url: string;
-
-  @IsNotEmpty()
-  @IsString()
-  cancel_url: string;
-
-  @IsNotEmpty()
-  @IsString()
-  ipn_url: string;
-
+  
   @IsNotEmpty()
   @IsString()
   shipping_method: string;
